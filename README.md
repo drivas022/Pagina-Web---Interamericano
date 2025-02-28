@@ -12,6 +12,7 @@
 ```
 **Primero se instala las librerias de python necesarias (instale las que sean necesarias)**
 **OJO DEBE TENER INSTALADO PIP**
+
 **Puede probar instalando este script, si le da error puede instalar uno por uno.**
 ```
 pip install fastapi uvicorn PyPDF2 gtts pdfminer.six
