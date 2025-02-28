@@ -14,3 +14,10 @@ pip install fastapi uvicorn PyPDF2 pyttsx3
 └── static
     └── style.css  (hoja de estilo opcional)
 ```
+
+**Para ejecutar la aplicación de manera local corremos el siguiente comando**
+
+```
+
+uvicorn main:app --reload
+```
