@@ -1,4 +1,5 @@
 # Pagina-Web---Interamericano
+
 @Autor Diego Rivas
 **Y el programa tendra la siguiente estructura**
 ```
@@ -25,7 +26,7 @@ pip install gtts
 ```
 pip install pdfminer.six
 ```
-**Finalmente instale el siguiente: **
+**Finalmente instale el siguiente:**
 ```
 pip install python-multipart
 ```
