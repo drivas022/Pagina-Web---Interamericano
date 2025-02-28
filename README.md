@@ -4,8 +4,6 @@
 pip install fastapi uvicorn PyPDF2 pyttsx3
 ```
 **Y el programa tendra la siguiente estructura**
-
-
 ```
 .
 ├── main.py        (archivo principal FastAPI)
@@ -16,8 +14,6 @@ pip install fastapi uvicorn PyPDF2 pyttsx3
 ```
 
 **Para ejecutar la aplicación de manera local corremos el siguiente comando**
-
 ```
-
 uvicorn main:app --reload
 ```
