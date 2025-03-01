@@ -35,26 +35,26 @@ input, button {
   border: 1px solid #ccc;
   padding: 10px;
   background: #ffffff;
-  transition: background-color 0.3s ease;
+  transition: background-color 0.3s ease, box-shadow 0.3s ease; /* Transición de sombra */
 }
 
 input:focus, button:focus {
   outline: none;
   background-color: #f0f8ff;
-  animation: pulse 1s infinite alternate;
+  box-shadow: 0 0 10px #003366; /* Efecto de iluminación detrás */
 }
 
 button {
   background-color: #003366; /* Azul marino */
   color: white;
   cursor: pointer;
-  transition: transform 0.2s, background-color 0.3s ease;
+  transition: transform 0.2s, background-color 0.3s ease, box-shadow 0.3s ease; /* Transición de sombra */
 }
 
 button:hover {
   background-color: #002244; /* Azul marino más oscuro */
   transform: scale(1.05);
-  animation: shake 0.5s infinite;
+  box-shadow: 0 0 20px #003366; /* Efecto de iluminación detrás */
 }
 
 textarea {
@@ -107,19 +107,18 @@ textarea:focus {
 .download-btn {
   display: inline-block;
   margin-top: 15px;
-  padding: 10px 15px;
-  font-size: 1rem;
+  padding: 8px 12px; /* Tamaño reducido del botón */
+  font-size: 0.9rem; /* Tamaño de fuente reducido */
   text-decoration: none;
   background-color: #003366; /* Azul marino */
   color: white;
   border-radius: 20px; /* Bordes redondeados */
-  transition: background-color 0.3s ease, transform 0.2s;
-  animation: bounce 2s infinite;
+  transition: background-color 0.3s ease, box-shadow 0.3s ease; /* Transición de sombra */
 }
 
 .download-btn:hover {
   background-color: #002244; /* Azul marino más oscuro */
-  transform: scale(1.05);
+  box-shadow: 0 0 20px #003366; /* Efecto de iluminación detrás */
 }
 
 @keyframes fadeIn {
