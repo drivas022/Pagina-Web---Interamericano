@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Convertir PDF a MP3</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <h1>Convertir PDF a MP3</h1>
+  <form action="/convert" method="post" enctype="multipart/form-data">
+    <label for="pdfFile">Selecciona un PDF:</label>
+    <input type="file" id="pdfFile" name="file" accept=".pdf" required>
+    <button type="submit">Convertir</button>
+  </form>
+</body>
+</html>
