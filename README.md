@@ -1,7 +1,8 @@
 # Pagina-Web---Interamericano
 
 @Autor Diego Rivas
-**Y el programa tendra la siguiente estructura**
+
+**El programa tendra la siguiente estructura**
 ```
 .
 ├── main.py        (archivo principal FastAPI)
@@ -10,6 +11,14 @@
 └── static
     └── style.css  (hoja de estilo opcional)
 ```
+**IMPORTANTE**
+
+Puedes intentar instalar mediante el archivo **"requirements.txt"** colocando lo siguiente*
+
+```
+pip install -r requirements.txt
+```
+
 **Primero se instala las librerias de python necesarias (instale las que sean necesarias)**
 **OJO DEBE TENER INSTALADO PIP**
 
