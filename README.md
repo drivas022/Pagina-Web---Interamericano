@@ -2,15 +2,6 @@
 
 @Autor Diego Rivas
 
-**El programa tendra la siguiente estructura**
-```
-.
-├── main.py        (archivo principal FastAPI)
-├── templates
-│   └── index.html (formulario de subida)
-└── static
-    └── style.css  (hoja de estilo opcional)
-```
 **IMPORTANTE**
 
 Puedes intentar instalar mediante el archivo **"requirements.txt"** colocando lo siguiente*
