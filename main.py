@@ -1,72 +1,68 @@
 from fastapi import FastAPI, File, UploadFile, Request
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
-import pyttsx3
-import PyPDF2
 import os
 import uuid
+from gtts import gTTS
+from pdfminer.high_level import extract_text
 
 app = FastAPI()
 
-# Montamos la carpeta "static" para servir CSS u otros archivos estáticos
+# Montar carpeta estática
 app.mount("/static", StaticFiles(directory="static"), name="static")
+app.mount("/audio", StaticFiles(directory="audio"), name="audio")  # Para servir archivos MP3
+
 
 @app.get("/", response_class=HTMLResponse)
-def read_root(request: Request):
+def read_root():
     """
-    Servir el formulario HTML para subir el PDF.
+    Servir la página HTML con el formulario.
     """
-    # Podríamos devolver directamente contenido HTML aquí,
-    # o podemos leer el HTML desde una plantilla "index.html"
     with open("templates/index.html", "r", encoding="utf-8") as f:
-        html_content = f.read()
-    return HTMLResponse(content=html_content, status_code=200)
+        return HTMLResponse(content=f.read(), status_code=200)
 
 
 @app.post("/convert")
 async def convert_pdf_to_audio(file: UploadFile = File(...)):
     """
-    Endpoint que recibe el PDF y devuelve un archivo mp3.
+    Recibe un PDF, extrae su texto y lo convierte en un archivo MP3.
     """
-    # 1. Guardar temporalmente el PDF subido para procesarlo.
+    # Guardar temporalmente el PDF
     pdf_filename = f"temp_{uuid.uuid4().hex}.pdf"
     with open(pdf_filename, "wb") as buffer:
         buffer.write(await file.read())
 
-    # 2. Extraer texto del PDF
+    # Extraer texto
     text = extract_text_from_pdf(pdf_filename)
 
-    # 3. Usar pyttsx3 para convertir a voz
-    mp3_filename = f"output_{uuid.uuid4().hex}.mp3"
+    if not text.strip():
+        os.remove(pdf_filename)
+        return JSONResponse(content={"error": "No se pudo extraer texto del PDF."}, status_code=400)
+
+    # Convertir texto a MP3
+    mp3_filename = f"audio/{uuid.uuid4().hex}.mp3"
     text_to_speech(text, mp3_filename)
 
-    # 4. Borrar el PDF temporal (opcional)
+    # Borrar el PDF temporal
     os.remove(pdf_filename)
 
-    # 5. Devolver el archivo mp3
-    return FileResponse(path=mp3_filename, media_type="audio/mpeg", filename="resultado.mp3")
+    # Devolver JSON con el texto extraído y la URL del MP3
+    return JSONResponse(content={
+        "texto": text,
+        "audio_url": f"/{mp3_filename}"
+    })
 
 
 def extract_text_from_pdf(pdf_path: str) -> str:
     """
-    Función auxiliar para extraer el texto completo de un PDF usando PyPDF2.
+    Extrae el texto del PDF usando pdfminer.six.
     """
-    text_content = []
-    with open(pdf_path, "rb") as f:
-        reader = PyPDF2.PdfReader(f)
-        for page in reader.pages:
-            text_content.append(page.extract_text())
-    return "\n".join(text_content)
+    return extract_text(pdf_path)
 
 
 def text_to_speech(text: str, output_filename: str):
     """
-    Convierte el texto en archivo de audio usando pyttsx3.
+    Convierte texto a voz usando gTTS y guarda el audio en un archivo MP3.
     """
-    engine = pyttsx3.init()
-    # Configurar propiedades (voz, velocidad, volumen, etc.) si se desea
-    # Por ejemplo:
-    # engine.setProperty('rate', 150)     # velocidad de lectura
-    # engine.setProperty('volume', 0.8)   # volumen (0.0 a 1.0)
-    engine.save_to_file(text, output_filename)
-    engine.runAndWait()
+    tts = gTTS(text=text, lang="es")
+    tts.save(output_filename)

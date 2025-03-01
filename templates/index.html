@@ -7,10 +7,93 @@
 </head>
 <body>
   <h1>Convertir PDF a MP3</h1>
-  <form action="/convert" method="post" enctype="multipart/form-data">
+
+  <form id="uploadForm" enctype="multipart/form-data">
     <label for="pdfFile">Selecciona un PDF:</label>
     <input type="file" id="pdfFile" name="file" accept=".pdf" required>
     <button type="submit">Convertir</button>
   </form>
+
+  <!-- Barra de progreso (inicialmente oculta) -->
+  <div id="progressContainer" class="progress-container">
+    <p>Procesando... Por favor, espera.</p>
+    <div class="progress-bar">
+      <div id="progressFill" class="progress-fill"></div>
+    </div>
+  </div>
+
+  <h2>Texto extraído:</h2>
+  <textarea id="extractedText" readonly></textarea>
+
+  <h2>Audio generado:</h2>
+  <audio id="audioPlayer" controls>
+    <source id="audioSource" src="" type="audio/mpeg">
+    Tu navegador no soporta el elemento de audio.
+  </audio>
+
+  <a id="downloadLink" class="download-btn" style="display:none;" download="resultado.mp3">Descargar MP3</a>
+
+  <script>
+    document.getElementById('uploadForm').onsubmit = async function(event) {
+        event.preventDefault();
+        
+        const formData = new FormData();
+        formData.append("file", document.getElementById('pdfFile').files[0]);
+
+        // Mostrar la barra de progreso
+        document.getElementById('progressContainer').style.display = 'block';
+        let progress = 0;
+        const progressInterval = setInterval(() => {
+            if (progress < 95) { // Simulación de progreso hasta 95%
+                progress += 5;
+                document.getElementById('progressFill').style.width = progress + "%";
+            }
+        }, 500);
+
+        const response = await fetch('/convert', { method: 'POST', body: formData });
+        clearInterval(progressInterval); // Detener la simulación de progreso
+        
+        const data = await response.json();
+        document.getElementById('progressFill').style.width = "100%"; // Llenar barra al 100%
+        setTimeout(() => {
+            document.getElementById('progressContainer').style.display = 'none'; // Ocultar barra
+        }, 1000);
+
+        if (data.error) {
+            alert(data.error);
+            return;
+        }
+
+        document.getElementById('extractedText').textContent = data.texto;
+        document.getElementById('audioSource').src = data.audio_url;
+        document.getElementById('audioPlayer').load();
+        document.getElementById('downloadLink').href = data.audio_url;
+        document.getElementById('downloadLink').style.display = 'block';
+    };
+
+    const audio = document.getElementById('audioPlayer');
+
+    // Adelantar y retroceder con doble clic en los extremos del reproductor
+    audio.addEventListener('click', function(event) {
+        const rect = audio.getBoundingClientRect();
+        const clickX = event.clientX - rect.left;
+
+        if (clickX < rect.width / 3) {
+            audio.currentTime -= 15; // Retrocede 15 segundos si haces doble clic en la izquierda
+        } else if (clickX > (rect.width / 3) * 2) {
+            audio.currentTime += 15; // Adelanta 15 segundos si haces doble clic en la derecha
+        }
+    });
+
+    // Adelantar y retroceder con las teclas de flecha
+    document.addEventListener('keydown', function(event) {
+        if (event.key === 'ArrowRight') {
+            audio.currentTime += 15;
+        }
+        if (event.key === 'ArrowLeft') {
+            audio.currentTime -= 15;
+        }
+    });
+  </script>
 </body>
 </html>

@@ -1,13 +1,77 @@
 body {
-    font-family: Arial, sans-serif;
-    margin: 30px;
-  }
-  h1 {
-    color: #333;
-  }
-  label, button {
-    font-size: 1.2rem;
-    margin: 10px 0;
-    display: block;
-  }
-  
+  font-family: Arial, sans-serif;
+  margin: 30px;
+  text-align: center;
+}
+
+h1, h2 {
+  color: #333;
+}
+
+form {
+  margin: 20px auto;
+  padding: 10px;
+  width: 300px;
+  border: 1px solid #ccc;
+  border-radius: 5px;
+  background: #f9f9f9;
+}
+
+input, button {
+  font-size: 1.2rem;
+  margin: 10px 0;
+  display: block;
+  width: 100%;
+}
+
+/* Cuadro de texto */
+textarea {
+  width: 80%;
+  height: 150px;
+  margin: 10px auto;
+  display: block;
+  font-size: 1rem;
+  padding: 10px;
+  border: 1px solid #ccc;
+  border-radius: 5px;
+}
+
+/* Contenedor de la barra de progreso */
+.progress-container {
+  display: none;
+  text-align: center;
+  margin: 20px auto;
+  width: 80%;
+}
+
+.progress-bar {
+  width: 100%;
+  height: 20px;
+  background-color: #eee;
+  border-radius: 10px;
+  overflow: hidden;
+  position: relative;
+}
+
+.progress-fill {
+  height: 100%;
+  width: 0;
+  background-color: #007bff;
+  transition: width 0.3s;
+}
+
+/* Botón de descarga */
+.download-btn {
+  display: inline-block;
+  margin-top: 15px;
+  padding: 10px 15px;
+  font-size: 1rem;
+  text-decoration: none;
+  background-color: #007bff;
+  color: white;
+  border-radius: 5px;
+}
+
+.download-btn:hover {
+  background-color: #0056b3;
+}
