@@ -2,10 +2,16 @@ body {
   font-family: Arial, sans-serif;
   margin: 30px;
   text-align: center;
+  background-color: #f0f8ff; /* Fondo blanco */
+  animation: backgroundFade 5s infinite alternate;
+  border: 10px solid #003366; /* Borde de color alrededor del fondo */
+  box-shadow: 0 0 20px rgba(0, 0, 0, 0.2); /* Sombra del fondo */
 }
 
 h1, h2 {
   color: #333;
+  animation: colorChange 3s infinite alternate;
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1); /* Sombra de texto */
 }
 
 form {
@@ -13,8 +19,11 @@ form {
   padding: 10px;
   width: 300px;
   border: 1px solid #ccc;
-  border-radius: 5px;
+  border-radius: 20px; /* Bordes redondeados */
   background: #f9f9f9;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+  animation: fadeIn 1s ease-in-out;
+  border: 2px solid #003366; /* Borde de color */
 }
 
 input, button {
@@ -22,9 +31,32 @@ input, button {
   margin: 10px 0;
   display: block;
   width: 100%;
+  border-radius: 20px; /* Bordes redondeados */
+  border: 1px solid #ccc;
+  padding: 10px;
+  background: #ffffff;
+  transition: background-color 0.3s ease;
 }
 
-/* Cuadro de texto */
+input:focus, button:focus {
+  outline: none;
+  background-color: #f0f8ff;
+  animation: pulse 1s infinite alternate;
+}
+
+button {
+  background-color: #003366; /* Azul marino */
+  color: white;
+  cursor: pointer;
+  transition: transform 0.2s, background-color 0.3s ease;
+}
+
+button:hover {
+  background-color: #002244; /* Azul marino más oscuro */
+  transform: scale(1.05);
+  animation: shake 0.5s infinite;
+}
+
 textarea {
   width: 80%;
   height: 150px;
@@ -33,15 +65,24 @@ textarea {
   font-size: 1rem;
   padding: 10px;
   border: 1px solid #ccc;
-  border-radius: 5px;
+  border-radius: 20px; /* Bordes redondeados */
+  background: #ffffff;
+  transition: background-color 0.3s ease;
+  animation: textFade 3s infinite alternate;
+  border: 2px solid #003366; /* Borde de color */
 }
 
-/* Contenedor de la barra de progreso */
+textarea:focus {
+  outline: none;
+  background-color: #f0f8ff;
+}
+
 .progress-container {
   display: none;
   text-align: center;
   margin: 20px auto;
   width: 80%;
+  animation: fadeIn 1s ease-in-out;
 }
 
 .progress-bar {
@@ -51,27 +92,118 @@ textarea {
   border-radius: 10px;
   overflow: hidden;
   position: relative;
+  animation: progressBar 3s infinite alternate;
+  border: 2px solid #003366; /* Borde de color */
 }
 
 .progress-fill {
   height: 100%;
   width: 0;
-  background-color: #007bff;
+  background-color: #003366; /* Azul marino */
   transition: width 0.3s;
+  animation: progressFill 3s infinite alternate;
 }
 
-/* Botón de descarga */
 .download-btn {
   display: inline-block;
   margin-top: 15px;
   padding: 10px 15px;
   font-size: 1rem;
   text-decoration: none;
-  background-color: #007bff;
+  background-color: #003366; /* Azul marino */
   color: white;
-  border-radius: 5px;
+  border-radius: 20px; /* Bordes redondeados */
+  transition: background-color 0.3s ease, transform 0.2s;
+  animation: bounce 2s infinite;
 }
 
 .download-btn:hover {
-  background-color: #0056b3;
+  background-color: #002244; /* Azul marino más oscuro */
+  transform: scale(1.05);
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pulse {
+  from {
+    transform: scale(1);
+  }
+  to {
+    transform: scale(1.05);
+  }
+}
+
+@keyframes shake {
+  0%, 100% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(-5px);
+  }
+  75% {
+    transform: translateX(5px);
+  }
+}
+
+@keyframes textFade {
+  from {
+    color: #333;
+  }
+  to {
+    color: #003366;
+  }
+}
+
+@keyframes progressBar {
+  from {
+    background-color: #eee;
+  }
+  to {
+    background-color: #003366;
+  }
+}
+
+@keyframes progressFill {
+  from {
+    width: 0;
+  }
+  to {
+    width: 100%;
+  }
+}
+
+@keyframes bounce {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+@keyframes backgroundFade {
+  from {
+    background-color: #f0f8ff;
+  }
+  to {
+    background-color: #e0e7ff;
+  }
+}
+
+@keyframes colorChange {
+  from {
+    color: #333;
+  }
+  to {
+    color: #003366;
+  }
 }
