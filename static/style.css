@@ -2,28 +2,25 @@ body {
   font-family: Arial, sans-serif;
   margin: 30px;
   text-align: center;
-  background-color: #f0f8ff; /* Fondo blanco */
+  background-color: #6699CC; /* Azul claro institucional */
   animation: backgroundFade 5s infinite alternate;
-  border: 10px solid #003366; /* Borde de color alrededor del fondo */
-  box-shadow: 0 0 20px rgba(0, 0, 0, 0.2); /* Sombra del fondo */
+  border: 10px solid #003366; /* Azul oscuro */
+  box-shadow: 0 0 20px rgba(0, 0, 0, 0.2);
 }
 
 h1, h2 {
-  color: #333;
-  animation: colorChange 3s infinite alternate;
-  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1); /* Sombra de texto */
+  color: #FFD700; /* Amarillo dorado */
+  text-shadow: 3px 3px 6px rgba(0, 0, 0, 0.3);
 }
 
 form {
   margin: 20px auto;
   padding: 10px;
-  width: 300px;
-  border: 1px solid #ccc;
-  border-radius: 20px; /* Bordes redondeados */
+  width: 320px;
+  border-radius: 20px;
   background: #f9f9f9;
-  box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
-  animation: fadeIn 1s ease-in-out;
-  border: 2px solid #003366; /* Borde de color */
+  box-shadow: 0 0 15px rgba(0, 0, 0, 0.2);
+  border: 3px solid #003366;
 }
 
 input, button {
@@ -31,11 +28,10 @@ input, button {
   margin: 10px 0;
   display: block;
   width: 100%;
-  border-radius: 20px; /* Bordes redondeados */
+  border-radius: 20px;
   border: 1px solid #ccc;
-  padding: 10px;
-  background: #ffffff;
-  transition: background-color 0.3s ease, box-shadow 0.3s ease; /* Transición de sombra */
+  padding: 12px;
+  transition: background-color 0.3s ease, box-shadow 0.3s ease;
 }
 
 input:focus, button:focus {
@@ -45,31 +41,30 @@ input:focus, button:focus {
 }
 
 button {
-  background-color: #003366; /* Azul marino */
-  color: white;
+  background-color: #FFC72C; /* Amarillo resaltado */
+  color: #003366;
+  font-weight: bold;
   cursor: pointer;
-  transition: transform 0.2s, background-color 0.3s ease, box-shadow 0.3s ease; /* Transición de sombra */
+  transition: transform 0.2s, background-color 0.3s ease, box-shadow 0.3s ease;
 }
 
 button:hover {
-  background-color: #002244; /* Azul marino más oscuro */
+  background-color: #FFA500;
   transform: scale(1.05);
-  box-shadow: 0 0 20px #003366; /* Efecto de iluminación detrás */
+  box-shadow: 0 0 15px #FFD700;
 }
 
 textarea {
-  width: 80%;
+  width: 85%;
   height: 150px;
   margin: 10px auto;
   display: block;
   font-size: 1rem;
   padding: 10px;
-  border: 1px solid #ccc;
-  border-radius: 20px; /* Bordes redondeados */
+  border: 2px solid #003366;
+  border-radius: 20px;
   background: #ffffff;
   transition: background-color 0.3s ease;
-  animation: textFade 3s infinite alternate;
-  border: 2px solid #003366; /* Borde de color */
 }
 
 textarea:focus {
@@ -78,7 +73,6 @@ textarea:focus {
 }
 
 .progress-container {
-  display: none;
   text-align: center;
   margin: 20px auto;
   width: 80%;
@@ -88,37 +82,44 @@ textarea:focus {
 .progress-bar {
   width: 100%;
   height: 20px;
-  background-color: #eee;
+  background-color: #EEE;
   border-radius: 10px;
   overflow: hidden;
-  position: relative;
-  animation: progressBar 3s infinite alternate;
-  border: 2px solid #003366; /* Borde de color */
+  border: 2px solid #003366;
 }
 
 .progress-fill {
   height: 100%;
   width: 0;
-  background-color: #003366; /* Azul marino */
+  background-color: #003366;
   transition: width 0.3s;
-  animation: progressFill 3s infinite alternate;
 }
+
 
 .download-btn {
   display: inline-block;
   margin-top: 15px;
-  padding: 8px 12px; /* Tamaño reducido del botón */
-  font-size: 0.9rem; /* Tamaño de fuente reducido */
-  text-decoration: none;
-  background-color: #003366; /* Azul marino */
-  color: white;
-  border-radius: 20px; /* Bordes redondeados */
-  transition: background-color 0.3s ease, box-shadow 0.3s ease; /* Transición de sombra */
+  padding: 10px 15px;
+  font-size: 1rem;
+  background-color: #FFC72C;
+  color: #003366;
+  border-radius: 20px;
+  transition: background-color 0.3s ease, box-shadow 0.3s ease;
 }
 
 .download-btn:hover {
-  background-color: #002244; /* Azul marino más oscuro */
-  box-shadow: 0 0 20px #003366; /* Efecto de iluminación detrás */
+  background-color: #FFA500;
+  box-shadow: 0 0 15px #FFD700;
+}
+
+.container {
+  max-width: 800px;
+  margin: 30px auto;
+  padding: 20px;
+  background: white;
+  border-radius: 20px;
+  box-shadow: 0 0 15px rgba(0, 0, 0, 0.2);
+  border: 2px solid #003366;
 }
 
 @keyframes fadeIn {
@@ -190,12 +191,8 @@ textarea:focus {
 }
 
 @keyframes backgroundFade {
-  from {
-    background-color: #f0f8ff;
-  }
-  to {
-    background-color: #e0e7ff;
-  }
+  from { background-color: #6699CC; }
+  to { background-color: #e0e7ff; }
 }
 
 @keyframes colorChange {
