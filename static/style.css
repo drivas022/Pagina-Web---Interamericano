@@ -1,82 +1,92 @@
+/* Estilo general de la página */
 body {
   font-family: Arial, sans-serif;
   margin: 30px;
   text-align: center;
-  background-color: #f0f8ff; /* Fondo blanco */
+  background-color: #f0f8ff; /* Fondo claro */
   animation: backgroundFade 5s infinite alternate;
-  border: 10px solid #003366; /* Borde de color alrededor del fondo */
-  box-shadow: 0 0 20px rgba(0, 0, 0, 0.2); /* Sombra del fondo */
+  border: 10px solid #003366; /* Borde azul oscuro */
+  box-shadow: 0 0 20px rgba(0, 0, 0, 0.2);
 }
 
+/* Estilos de títulos */
 h1, h2 {
   color: #333;
   animation: colorChange 3s infinite alternate;
-  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1); /* Sombra de texto */
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
 }
 
+/* Contenedor del formulario */
 form {
   margin: 20px auto;
   padding: 10px;
   width: 300px;
   border: 1px solid #ccc;
-  border-radius: 20px; /* Bordes redondeados */
+  border-radius: 20px;
   background: #f9f9f9;
   box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
   animation: fadeIn 1s ease-in-out;
-  border: 2px solid #003366; /* Borde de color */
+  border: 2px solid #003366;
 }
 
+/* Campos de entrada y botones */
 input, button {
   font-size: 1.2rem;
   margin: 10px 0;
   display: block;
   width: 100%;
-  border-radius: 20px; /* Bordes redondeados */
+  border-radius: 20px;
   border: 1px solid #ccc;
   padding: 10px;
   background: #ffffff;
-  transition: background-color 0.3s ease, box-shadow 0.3s ease; /* Transición de sombra */
+  transition: background-color 0.3s ease, box-shadow 0.3s ease;
 }
 
+/* Efecto al hacer focus en input y botón */
 input:focus, button:focus {
   outline: none;
   background-color: #f0f8ff;
-  box-shadow: 0 0 10px #003366; /* Efecto de iluminación detrás */
+  box-shadow: 0 0 10px #003366;
 }
 
+/* Estilo del botón */
 button {
-  background-color: #003366; /* Azul marino */
+  background-color: #003366;
   color: white;
   cursor: pointer;
-  transition: transform 0.2s, background-color 0.3s ease, box-shadow 0.3s ease; /* Transición de sombra */
+  transition: transform 0.2s, background-color 0.3s ease, box-shadow 0.3s ease;
 }
 
+/* Efecto hover del botón */
 button:hover {
-  background-color: #002244; /* Azul marino más oscuro */
+  background-color: #002244;
   transform: scale(1.05);
-  box-shadow: 0 0 20px #003366; /* Efecto de iluminación detrás */
+  box-shadow: 0 0 20px #003366;
 }
 
+/* Cuadro de texto grande para mostrar la información convertida */
 textarea {
-  width: 80%;
-  height: 150px;
-  margin: 10px auto;
+  width: 70%; /* Ocupar más ancho */
+  height: 300px; /* Tamaño grande */
+  margin: 20px auto;
   display: block;
-  font-size: 1rem;
-  padding: 10px;
-  border: 1px solid #ccc;
-  border-radius: 20px; /* Bordes redondeados */
+  font-size: 1.1rem;
+  padding: 15px;
+  border: 2px solid #003366;
+  border-radius: 10px;
   background: #ffffff;
-  transition: background-color 0.3s ease;
-  animation: textFade 3s infinite alternate;
-  border: 2px solid #003366; /* Borde de color */
+  overflow-y: auto; /* Agregar scroll si es necesario */
+  resize: vertical; /* Permitir que el usuario lo ajuste manualmente */
+  max-height: 500px; /* Altura máxima */
 }
 
+/* Efecto focus del cuadro de texto */
 textarea:focus {
   outline: none;
   background-color: #f0f8ff;
 }
 
+/* Barra de progreso */
 .progress-container {
   display: none;
   text-align: center;
@@ -92,117 +102,47 @@ textarea:focus {
   border-radius: 10px;
   overflow: hidden;
   position: relative;
-  animation: progressBar 3s infinite alternate;
-  border: 2px solid #003366; /* Borde de color */
+  border: 2px solid #003366;
 }
 
 .progress-fill {
   height: 100%;
   width: 0;
-  background-color: #003366; /* Azul marino */
+  background-color: #003366;
   transition: width 0.3s;
-  animation: progressFill 3s infinite alternate;
 }
 
+/* Estilo del botón de descarga */
 .download-btn {
   display: inline-block;
   margin-top: 15px;
-  padding: 8px 12px; /* Tamaño reducido del botón */
-  font-size: 0.9rem; /* Tamaño de fuente reducido */
+  padding: 12px 20px;
+  font-size: 1rem;
   text-decoration: none;
-  background-color: #003366; /* Azul marino */
+  background-color: #003366;
   color: white;
-  border-radius: 20px; /* Bordes redondeados */
-  transition: background-color 0.3s ease, box-shadow 0.3s ease; /* Transición de sombra */
+  border-radius: 20px;
+  transition: background-color 0.3s ease, box-shadow 0.3s ease;
 }
 
+/* Efecto hover del botón de descarga */
 .download-btn:hover {
-  background-color: #002244; /* Azul marino más oscuro */
-  box-shadow: 0 0 20px #003366; /* Efecto de iluminación detrás */
+  background-color: #002244;
+  box-shadow: 0 0 20px #003366;
 }
 
+/* Animaciones */
 @keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(-20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@keyframes pulse {
-  from {
-    transform: scale(1);
-  }
-  to {
-    transform: scale(1.05);
-  }
-}
-
-@keyframes shake {
-  0%, 100% {
-    transform: translateX(0);
-  }
-  25% {
-    transform: translateX(-5px);
-  }
-  75% {
-    transform: translateX(5px);
-  }
-}
-
-@keyframes textFade {
-  from {
-    color: #333;
-  }
-  to {
-    color: #003366;
-  }
-}
-
-@keyframes progressBar {
-  from {
-    background-color: #eee;
-  }
-  to {
-    background-color: #003366;
-  }
-}
-
-@keyframes progressFill {
-  from {
-    width: 0;
-  }
-  to {
-    width: 100%;
-  }
-}
-
-@keyframes bounce {
-  0%, 100% {
-    transform: translateY(0);
-  }
-  50% {
-    transform: translateY(-10px);
-  }
+  from { opacity: 0; transform: translateY(-20px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 @keyframes backgroundFade {
-  from {
-    background-color: #f0f8ff;
-  }
-  to {
-    background-color: #e0e7ff;
-  }
+  from { background-color: #f0f8ff; }
+  to { background-color: #e0e7ff; }
 }
 
 @keyframes colorChange {
-  from {
-    color: #333;
-  }
-  to {
-    color: #003366;
-  }
+  from { color: #333; }
+  to { color: #003366; }
 }
