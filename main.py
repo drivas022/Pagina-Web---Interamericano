@@ -1,17 +1,17 @@
-from fastapi import FastAPI, File, UploadFile, Request
-from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
-from fastapi.staticfiles import StaticFiles
-import os
+from fastapi import FastAPI, UploadFile, File, BackgroundTasks
+from fastapi.responses import FileResponse, JSONResponse, HTMLResponse
+from pathlib import Path
 import uuid
+import shutil
+import pdfplumber
 from gtts import gTTS
-from pdfminer.high_level import extract_text
+import os
 
 app = FastAPI()
 
-# Montar carpeta estática
-app.mount("/static", StaticFiles(directory="static"), name="static")
-app.mount("/audio", StaticFiles(directory="audio"), name="audio")  # Para servir archivos MP3
-
+# Directorio para almacenar archivos
+AUDIO_DIR = Path("audio")
+AUDIO_DIR.mkdir(exist_ok=True)
 
 @app.get("/", response_class=HTMLResponse)
 def read_root():
@@ -21,48 +21,53 @@ def read_root():
     with open("templates/index.html", "r", encoding="utf-8") as f:
         return HTMLResponse(content=f.read(), status_code=200)
 
-
 @app.post("/convert")
-async def convert_pdf_to_audio(file: UploadFile = File(...)):
+async def convert_pdf_to_audio(background_tasks: BackgroundTasks, file: UploadFile = File(...)):
     """
-    Recibe un PDF, extrae su texto y lo convierte en un archivo MP3.
+    Procesar el archivo PDF, extraer texto y convertirlo a MP3.
     """
-    # Guardar temporalmente el PDF
-    pdf_filename = f"temp_{uuid.uuid4().hex}.pdf"
-    with open(pdf_filename, "wb") as buffer:
-        buffer.write(await file.read())
-
-    # Extraer texto
-    text = extract_text_from_pdf(pdf_filename)
-
+    # Guardar el PDF temporalmente
+    temp_pdf_path = Path(f"temp_{uuid.uuid4().hex}.pdf")
+    with temp_pdf_path.open("wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
+    
+    # Extraer texto del PDF
+    text = ""
+    with pdfplumber.open(temp_pdf_path) as pdf:
+        for page in pdf.pages:
+            text += page.extract_text() + " "
+    
+    temp_pdf_path.unlink()  # Eliminar PDF después de la extracción
+    
     if not text.strip():
-        os.remove(pdf_filename)
         return JSONResponse(content={"error": "No se pudo extraer texto del PDF."}, status_code=400)
-
-    # Convertir texto a MP3
-    mp3_filename = f"audio/{uuid.uuid4().hex}.mp3"
-    text_to_speech(text, mp3_filename)
-
-    # Borrar el PDF temporal
-    os.remove(pdf_filename)
-
-    # Devolver JSON con el texto extraído y la URL del MP3
+    
+    # Generar nombre de archivo MP3
+    mp3_filename = f"{uuid.uuid4().hex}.mp3"
+    mp3_path = AUDIO_DIR / mp3_filename
+    
+    # Procesar en segundo plano
+    background_tasks.add_task(generate_audio, text, mp3_path)
+    
     return JSONResponse(content={
         "texto": text,
-        "audio_url": f"/{mp3_filename}"
+        "audio_url": f"/audio/{mp3_filename}"
     })
 
+def generate_audio(text: str, output_path: Path):
+    """Genera el archivo de audio a partir del texto."""
+    try:
+        tts = gTTS(text=text, lang='es', slow=False)
+        tts.save(str(output_path))
+    except Exception as e:
+        print(f"Error al generar el audio: {e}")
 
-def extract_text_from_pdf(pdf_path: str) -> str:
+@app.get("/audio/{filename}")
+def get_audio(filename: str):
     """
-    Extrae el texto del PDF usando pdfminer.six.
+    Servir el archivo de audio generado.
     """
-    return extract_text(pdf_path)
-
-
-def text_to_speech(text: str, output_filename: str):
-    """
-    Convierte texto a voz usando gTTS y guarda el audio en un archivo MP3.
-    """
-    tts = gTTS(text=text, lang="es")
-    tts.save(output_filename)
+    file_path = AUDIO_DIR / filename
+    if file_path.exists():
+        return FileResponse(file_path, media_type="audio/mpeg")
+    return JSONResponse(content={"error": "Archivo no encontrado"}, status_code=404)

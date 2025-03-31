@@ -15,7 +15,7 @@ pip install -r requirements.txt
 
 **Puede probar instalando este script, si le da error puede instalar uno por uno.**
 ```
-pip install fastapi uvicorn PyPDF2 gtts pdfminer.six
+pip install fastapi uvicorn PyPDF2 gtts pdfminer.six pdfplumber
 ```
 **Si en dado caso le dio error el script de arriba instale lo siguiente:**    
 ```
@@ -26,6 +26,9 @@ pip install gtts
 ```
 ```
 pip install pdfminer.six
+```
+```
+pip install pdfplumber
 ```
 **Finalmente instale el siguiente:**
 ```

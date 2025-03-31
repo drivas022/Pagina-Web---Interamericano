@@ -1,0 +1,38 @@
+Pasos para Instalar ffmpeg en Windows
+
+Descargar ffmpeg
+
+    Ve al sitio web oficial: https://ffmpeg.org/download.html.
+
+    En la sección "Get packages & executable files", haz clic en Windows.
+
+    Descarga la versión "Full Build" desde Gyan.dev.
+
+Extraer los archivos
+
+    Descomprime el archivo ZIP en una ubicación accesible, por ejemplo:
+    C:\ffmpeg\
+
+    Dentro de C:\ffmpeg\, verás una carpeta llamada algo como ffmpeg-6.0-full_build.
+    Dentro de esta, encontrarás una carpeta bin con los archivos necesarios.
+
+Agregar ffmpeg al PATH
+    Para que Windows reconozca ffmpeg desde cualquier parte, sigue estos pasos:
+
+    Abre el menú Inicio y busca "Editar las variables de entorno del sistema".
+
+    En la pestaña Opciones avanzadas, haz clic en "Variables de entorno...".
+
+    En Variables del sistema, selecciona Path y haz clic en Editar....
+
+    Presiona Nuevo y agrega la ruta de la carpeta bin de ffmpeg, por ejemplo:
+    C:\ffmpeg\ffmpeg-6.0-full_build\bin
+
+    Guarda los cambios y cierra las ventanas.
+
+Verificar la instalación
+
+    Abre Símbolo del sistema (cmd) y escribe:
+    ffmpeg -version
+
+    Si ves información sobre ffmpeg, significa que la instalación fue exitosa.
