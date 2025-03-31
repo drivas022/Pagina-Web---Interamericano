@@ -1,3 +1,38 @@
-audio\
-temp\
-__pycache__\s
+# Carpetas a ignorar
+audio/
+temp/
+__pycache__/
+
+# Archivos de Python compilados
+*.pyc
+*.pyo
+*.pyd
+
+# Archivos multimedia pesados
+*.mp3
+
+# Archivos PDF
+*.pdf
+
+# Archivos de sistema (opcional)
+.DS_Store
+Thumbs.db
+
+# Entornos virtuales (opcional, si usas venv)
+venv/
+.env/
+
+# Archivos de logs
+*.log
+
+# Archivos de configuración IDE específicos
+.idea/
+.vscode/
+*.sublime-project
+*.sublime-workspace
+
+# Archivos de documentos Word
+*.docx
+
+# Archivos de configuración local (si tienes)
+config.local.json
