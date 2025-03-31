@@ -24,25 +24,10 @@ Una aplicación web que convierte archivos PDF y DOCX a formato de audio MP3, pe
 ### 1. Clonar el repositorio
 
 ```bash
-git clone https://github.com/tu-usuario/convertidor-documentos-audio.git
-cd convertidor-documentos-audio
+git clone https://github.com/drivas022/Pagina-Web---Interamericano.git
 ```
 
-### 2. (Recomendado) Crear un entorno virtual
-
-#### En Windows:
-```bash
-python -m venv venv
-venv\Scripts\activate
-```
-
-#### En macOS/Linux:
-```bash
-python3 -m venv venv
-source venv/bin/activate
-```
-
-### 3. Instalar las dependencias
+### 2. Instalar las dependencias
 
 ```bash
 pip install -r requirements.txt
@@ -54,7 +39,7 @@ Si no existe el archivo requirements.txt, instala las dependencias manualmente:
 pip install fastapi uvicorn python-multipart gtts pdfminer.six python-docx
 ```
 
-### 4. Crear las carpetas necesarias
+### 3. Crear las carpetas necesarias
 
 ```bash
 mkdir -p templates static audio temp
@@ -66,6 +51,11 @@ mkdir -p templates static audio temp
 
 ```bash
 uvicorn main:app --reload
+```
+O tambien se puede utilizar
+
+```bash
+python -m uvicorn main:app --reload
 ```
 
 Para uso en producción, se recomienda:
