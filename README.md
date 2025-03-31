@@ -1,44 +1,49 @@
-# Pagina-Web---Interamericano
+# Archivo README.md
 
-@Autor Diego Rivas
+## Proyecto: Convertir archivos a Audio
 
-**IMPORTANTE**
+Este proyecto es una API desarrollada con FastAPI que permite subir archivos en formato PDF o DOCX, extraer su contenido de texto y convertirlo en un archivo de audio MP3 utilizando gTTS.
 
-Puedes intentar instalar mediante el archivo **"requirements.txt"** colocando lo siguiente*
+### Requisitos previos
+- Tener instalado Python 3.7 o superior.
+- Tener `pip` actualizado.
 
+### Instalación
+1. Clonar este repositorio:
+   ```sh
+   git clone https://github.com/tu-repositorio/tu-proyecto.git
+   cd tu-proyecto
+   ```
+2. Instalar las dependencias:
+   ```sh
+   pip install -r requirements.txt
+   ```
+
+### Uso
+1. Ejecutar el servidor con Uvicorn:
+   ```sh
+   uvicorn main:app --reload
+   ```
+2. Acceder a la API en el navegador:
+   ```
+   http://127.0.0.1:8000
+   ```
+3. Para probar la API, sube un archivo PDF o DOCX en el endpoint `/convert` y obtendrás un enlace de descarga del archivo MP3 generado.
+
+### Estructura del Proyecto
 ```
-pip install -r requirements.txt
+📂 tu-proyecto
+├── 📂 static        # Archivos estáticos como CSS, JS e imágenes
+├── 📂 audio         # Carpeta donde se almacenan los audios generados
+├── 📂 templates     # Plantillas HTML
+├── main.py         # Código principal de la API
+├── requirements.txt # Dependencias necesarias para correr el proyecto
+├── README.md       # Instrucciones y documentación del proyecto
 ```
 
-**Primero se instala las librerias de python necesarias (instale las que sean necesarias)**
-**OJO DEBE TENER INSTALADO PIP**
+### Notas
+- Los archivos de audio generados se almacenarán en la carpeta `audio/`.
+- Se recomienda usar un entorno virtual para evitar conflictos con otras dependencias.
 
-**Puede probar instalando este script, si le da error puede instalar uno por uno.**
-```
-pip install fastapi uvicorn PyPDF2 gtts pdfminer.six
-```
-**Si en dado caso le dio error el script de arriba instale lo siguiente:**    
-```
-pip install fastapi uvicorn PyPDF2 pyttsx3
-```
-```
-pip install gtts
-```
-```
-pip install pdfminer.six
-```
-**Finalmente instale el siguiente:**
-```
-pip install python-multipart
-```
-
-
-**Para ejecutar la aplicación de manera local corremos el siguiente comando**
-```
-uvicorn main:app --reload
-```
-**Si este no corre, puede probar con el siguiente comando**
-```
-python -m uvicorn main:app --reload
-```
-
+### Licencia
+Este proyecto está bajo la licencia MIT.
