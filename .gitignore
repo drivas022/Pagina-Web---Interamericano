@@ -36,3 +36,7 @@ venv/
 
 # Archivos de configuración local (si tienes)
 config.local.json
+
+# Ignorar todos los .txt excepto requirements.txt
+*.txt
+!requirements.txt
