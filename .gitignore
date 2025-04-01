@@ -1,6 +1,6 @@
 # Carpetas a ignorar
-audio/
-temp/
+#audio/ #opcional
+#temp/ #opcional
 __pycache__/
 
 # Archivos de Python compilados

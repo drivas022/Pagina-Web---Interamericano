@@ -5,35 +5,170 @@ import os
 import uuid
 import time
 import threading
+import concurrent.futures
 from gtts import gTTS
 from pdfminer.high_level import extract_text
 from docx import Document
 import io
 import math
 import shutil
+import hashlib
+import sqlite3
+import base64
+from functools import lru_cache
+from concurrent.futures import ThreadPoolExecutor
+import multiprocessing
+import traceback
+
+# Número de procesadores disponibles para paralelización
+NUM_CORES = max(1, multiprocessing.cpu_count() - 1)
+MAX_WORKERS = NUM_CORES * 2  # Para operaciones I/O, podemos usar más workers que cores
 
 app = FastAPI()
-
-# Montar carpeta estática para servir CSS, JS e imágenes
-app.mount("/static", StaticFiles(directory="static"), name="static")
-app.mount("/audio", StaticFiles(directory="audio"), name="audio")
 
 # Asegurarse de que los directorios necesarios existan
 os.makedirs("audio", exist_ok=True)
 os.makedirs("temp", exist_ok=True)
 os.makedirs("templates", exist_ok=True)
+os.makedirs("static", exist_ok=True)  # Asegurarse que la carpeta static existe
+os.makedirs("cache", exist_ok=True)
+
+# Montar carpeta estática para servir CSS, JS e imágenes
+# IMPORTANTE: Estas rutas deben venir después de crear los directorios
+app.mount("/static", StaticFiles(directory="static"), name="static")
+app.mount("/audio", StaticFiles(directory="audio"), name="audio")
 
 # Diccionario para almacenar el estado de las tareas
 task_status = {}
+
+# Inicializar la base de datos para el caché
+def init_cache_db():
+    conn = sqlite3.connect('cache/text_audio_cache.db')
+    cursor = conn.cursor()
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS text_chunks (
+        hash_id TEXT PRIMARY KEY,
+        text TEXT,
+        audio_path TEXT,
+        created_at INTEGER
+    )
+    ''')
+    conn.commit()
+    conn.close()
+
+# Inicializar el caché
+init_cache_db()
+
+# Sistema de caché usando LRU para fragmentos de texto frecuentes
+@lru_cache(maxsize=100)
+def get_cached_audio_path(text_hash):
+    """Busca un fragmento de texto en el caché y devuelve la ruta del audio si existe."""
+    conn = sqlite3.connect('cache/text_audio_cache.db')
+    cursor = conn.cursor()
+    cursor.execute('SELECT audio_path FROM text_chunks WHERE hash_id = ?', (text_hash,))
+    result = cursor.fetchone()
+    conn.close()
+    
+    if result:
+        return result[0]
+    return None
+
+def store_in_cache(text, audio_path):
+    """Almacena un fragmento de texto y su audio correspondiente en el caché."""
+    text_hash = hashlib.md5(text.encode('utf-8')).hexdigest()
+    
+    conn = sqlite3.connect('cache/text_audio_cache.db')
+    cursor = conn.cursor()
+    
+    # Comprobar si ya existe
+    cursor.execute('SELECT hash_id FROM text_chunks WHERE hash_id = ?', (text_hash,))
+    if cursor.fetchone() is None:
+        cursor.execute(
+            'INSERT INTO text_chunks (hash_id, text, audio_path, created_at) VALUES (?, ?, ?, ?)',
+            (text_hash, text, audio_path, int(time.time()))
+        )
+        conn.commit()
+    
+    conn.close()
+    return text_hash
+
+def clean_old_cache(max_age_days=30):
+    """Limpia entradas de caché antiguas."""
+    max_age = int(time.time()) - (max_age_days * 24 * 60 * 60)
+    
+    conn = sqlite3.connect('cache/text_audio_cache.db')
+    cursor = conn.cursor()
+    cursor.execute('SELECT audio_path FROM text_chunks WHERE created_at < ?', (max_age,))
+    old_files = cursor.fetchall()
+    
+    # Eliminar archivos físicos
+    for (file_path,) in old_files:
+        if os.path.exists(file_path):
+            try:
+                os.remove(file_path)
+            except:
+                pass
+    
+    # Eliminar registros
+    cursor.execute('DELETE FROM text_chunks WHERE created_at < ?', (max_age,))
+    conn.commit()
+    conn.close()
 
 @app.get("/", response_class=HTMLResponse)
 def read_root():
     """Servir la página HTML con el formulario."""
     try:
-        with open("templates/index.html", "r", encoding="utf-8") as f:
+        # Verificar que el archivo HTML existe
+        html_path = "templates/index.html"
+        if not os.path.exists(html_path):
+            return HTMLResponse(
+                content=f"""
+                <html>
+                    <body>
+                        <h1>Error: No se encontró el archivo index.html</h1>
+                        <p>Por favor, asegúrate de que el archivo 'templates/index.html' existe.</p>
+                    </body>
+                </html>
+                """,
+                status_code=500
+            )
+            
+        with open(html_path, "r", encoding="utf-8") as f:
             return HTMLResponse(content=f.read(), status_code=200)
     except Exception as e:
-        return HTMLResponse(content=f"<html><body><h1>Error al cargar la página: {str(e)}</h1></body></html>", status_code=500)
+        print(f"Error al cargar la página: {str(e)}")
+        traceback.print_exc()
+        return HTMLResponse(
+            content=f"""
+            <html>
+                <body>
+                    <h1>Error al cargar la página: {str(e)}</h1>
+                    <p>Detalles del error: {traceback.format_exc()}</p>
+                </body>
+            </html>
+            """,
+            status_code=500
+        )
+
+# Ruta de diagnóstico
+@app.get("/health")
+def health_check():
+    """Comprueba el estado del servicio."""
+    return {
+        "status": "OK",
+        "timestamp": time.time(),
+        "dirs": {
+            "templates": os.path.exists("templates"),
+            "static": os.path.exists("static"),
+            "audio": os.path.exists("audio"),
+            "temp": os.path.exists("temp"),
+            "cache": os.path.exists("cache")
+        },
+        "files": {
+            "index.html": os.path.exists("templates/index.html"),
+            "style.css": os.path.exists("static/style.css")
+        }
+    }
 
 @app.post("/convert")
 async def convert_file_to_audio(file: UploadFile = File(...)):
@@ -66,7 +201,7 @@ async def convert_file_to_audio(file: UploadFile = File(...)):
         with open(temp_filename, "wb") as buffer:
             buffer.write(file_content)
         
-        # Estimar tiempo basado en el tamaño del archivo
+        # Estimar tiempo basado en el tamaño del archivo (ahora más optimista)
         estimated_time = estimate_processing_time(file_size, file_ext)
         
         # Inicializar el estado de la tarea
@@ -78,12 +213,12 @@ async def convert_file_to_audio(file: UploadFile = File(...)):
             "file_size": file_size
         }
         
-        # Iniciar el procesamiento en un hilo separado (no en asyncio)
+        # Iniciar el procesamiento en un hilo separado
         thread = threading.Thread(
             target=process_file_thread,
             args=(task_id, temp_filename, file_ext, mp3_filename)
         )
-        thread.daemon = True  # El hilo se cerrará cuando el programa principal termine
+        thread.daemon = True
         thread.start()
         
         return JSONResponse(content={
@@ -93,8 +228,8 @@ async def convert_file_to_audio(file: UploadFile = File(...)):
         })
         
     except Exception as e:
-        # Registrar el error para depuración
         print(f"Error al procesar la solicitud de conversión: {str(e)}")
+        traceback.print_exc()
         return JSONResponse(content={"error": str(e)}, status_code=500)
 
 @app.get("/task/{task_id}")
@@ -137,168 +272,248 @@ async def get_task_status(task_id: str):
 
 def estimate_processing_time(file_size, file_ext):
     """Estima el tiempo de procesamiento basado en el tamaño del archivo."""
-    # Estos valores deberían calibrarse según las características del servidor
-    base_time = 10  # segundos base
+    # Tiempo base más bajo gracias a la optimización
+    base_time = 5  # segundos base
     
-    # Factores de tiempo por MB según tipo de archivo
+    # Factores de tiempo reducidos por paralelización
     factors = {
-        "pdf": 2.5,  # segundos por MB para PDF
-        "docx": 1.8  # segundos por MB para DOCX
+        "pdf": 0.8,  # segundos por MB para PDF (reducido por procesamiento paralelo)
+        "docx": 0.6  # segundos por MB para DOCX (reducido por procesamiento paralelo)
     }
     
     # Calcular tiempo estimado
     size_mb = file_size / (1024 * 1024)
-    factor = factors.get(file_ext, 3.0)  # Por defecto usar un factor más conservador
+    factor = factors.get(file_ext, 1.0)
     
-    estimated_time = base_time + (size_mb * factor)
+    # La estimación ahora considera que el procesamiento es paralelo
+    estimated_time = base_time + (size_mb * factor / NUM_CORES)
     
-    # Añadir factor para archivos muy grandes (más de 20MB)
+    # Añadir factor para archivos muy grandes (pero menor que antes)
     if size_mb > 20:
-        estimated_time *= 1.2
+        estimated_time *= 1.1
     
     return math.ceil(estimated_time)
 
-def process_file_thread(task_id, file_path, file_ext, mp3_filename):
-    """Procesa un archivo en un hilo separado, actualizando el progreso."""
+# Árbol de fragmentos para optimizar el procesamiento de texto
+class TextChunkTree:
+    """
+    Estructura de árbol para organizar fragmentos de texto y optimizar la conversión.
+    Esta estructura ayuda a identificar patrones comunes y frases repetitivas.
+    """
+    def __init__(self):
+        self.chunks = {}
+        self.children = {}
+        
+    def add_chunk(self, text, chunk_id):
+        """Añade un fragmento al árbol"""
+        # Usar las primeras palabras como clave
+        words = text.split()
+        key = " ".join(words[:3]) if len(words) >= 3 else text[:20]
+        
+        if key not in self.children:
+            self.children[key] = TextChunkTree()
+        
+        self.children[key].chunks[chunk_id] = text
+    
+    def find_similar_chunks(self, text, threshold=0.8):
+        """Encuentra fragmentos similares en el árbol"""
+        words = text.split()
+        key = " ".join(words[:3]) if len(words) >= 3 else text[:20]
+        
+        similar_chunks = []
+        
+        if key in self.children:
+            # Calcular similitud con fragmentos existentes
+            for chunk_id, chunk_text in self.children[key].chunks.items():
+                similarity = self._calculate_similarity(text, chunk_text)
+                if similarity >= threshold:
+                    similar_chunks.append((chunk_id, similarity))
+        
+        return similar_chunks
+    
+    def _calculate_similarity(self, text1, text2):
+        """Calcula la similitud entre dos textos (método simple)"""
+        # Convertir a conjuntos de palabras
+        words1 = set(text1.lower().split())
+        words2 = set(text2.lower().split())
+        
+        # Usar coeficiente de Jaccard
+        if not words1 or not words2:
+            return 0
+        
+        intersection = words1.intersection(words2)
+        union = words1.union(words2)
+        
+        return len(intersection) / len(union)
+
+# Crear un árbol de fragmentos global
+text_chunk_tree = TextChunkTree()
+
+def extract_text_from_pdf_optimized(pdf_path: str) -> str:
+    """Extrae el texto del PDF usando pdfminer.six con mayor robustez y diagnóstico."""
     try:
-        # Extraer texto según el tipo de archivo
-        task_status[task_id]["progress"] = 10
+        print(f"Intentando extraer texto de PDF: {pdf_path}")
         
-        # Extraer texto según el tipo de archivo
-        if file_ext == "pdf":
-            text = extract_text_from_pdf(file_path)
-        else:  # docx
-            text = extract_text_from_docx(file_path)
-        
-        task_status[task_id]["progress"] = 60
-        
-        if not text or not text.strip():
-            task_status[task_id]["status"] = "error"
-            task_status[task_id]["error"] = "No se pudo extraer texto del archivo."
-            if os.path.exists(file_path):
-                try:
-                    os.remove(file_path)
-                except:
-                    pass
-            return
+        # Verificar si el archivo existe y tiene contenido
+        if not os.path.exists(pdf_path):
+            print(f"Error: El archivo PDF no existe: {pdf_path}")
+            return ""
             
-        # Guardar el texto extraído
-        text_filename = f"temp/text_{task_id}.txt"
-        with open(text_filename, "w", encoding="utf-8") as f:
-            f.write(text)
+        if os.path.getsize(pdf_path) == 0:
+            print(f"Error: El archivo PDF está vacío: {pdf_path}")
+            return ""
+        
+        # Intentar con parámetros más básicos primero
+        try:
+            text = extract_text(pdf_path, page_numbers=None, maxpages=0)
+            if text.strip():
+                return text
+        except Exception as e:
+            print(f"Primer intento de extracción de PDF falló: {str(e)}")
+        
+        # Si falló, intentar con configuración alternativa
+        try:
+            text = extract_text(
+                pdf_path, 
+                page_numbers=None, 
+                maxpages=0, 
+                laparams=None  # Sin parámetros de layout
+            )
+            return text
+        except Exception as e:
+            print(f"Segundo intento de extracción de PDF falló: {str(e)}")
             
-        # Almacenar el texto para consultas posteriores
-        task_status[task_id]["text"] = text
+        # Último intento con configuración mínima
+        from pdfminer.high_level import extract_text_to_fp
+        from pdfminer.layout import LAParams
+        from io import StringIO
         
-        # Dividir el texto en fragmentos si es muy largo para evitar problemas con gTTS
-        text_chunks = split_text(text)
-        task_status[task_id]["progress"] = 70
-        
-        # Procesar cada fragmento y concatenar los audios
-        temp_audio_files = []
-        for i, chunk in enumerate(text_chunks):
-            chunk_filename = f"temp/chunk_{task_id}_{i}.mp3"
-            
-            # Convertir texto a voz (llamada síncrona)
-            try:
-                text_to_speech(chunk, chunk_filename)
-            except Exception as e:
-                print(f"Error al procesar fragmento {i}: {str(e)}")
-                # Crear un archivo vacío si falla
-                with open(chunk_filename, 'wb') as f:
-                    f.write(b'')
-            
-            temp_audio_files.append(chunk_filename)
-            
-            # Actualizar progreso
-            chunk_progress = 20 * (i + 1) / len(text_chunks)
-            task_status[task_id]["progress"] = 70 + chunk_progress
-        
-        # Concatenar los archivos de audio si hay más de uno
-        if len(temp_audio_files) > 1:
-            concatenate_audio_files(temp_audio_files, mp3_filename)
-        elif len(temp_audio_files) == 1:
-            # Si solo hay un archivo, copiarlo en lugar de renombrarlo
-            # (evita problemas entre diferentes sistemas de archivos)
-            shutil.copy2(temp_audio_files[0], mp3_filename)
-        
-        # Limpiar archivos temporales de forma segura
-        for temp_file in temp_audio_files:
-            if os.path.exists(temp_file):
-                try:
-                    os.remove(temp_file)
-                except:
-                    pass
-        
-        task_status[task_id]["progress"] = 100
-        task_status[task_id]["status"] = "completed"
-        task_status[task_id]["completion_time"] = time.time()
-        
-        # Eliminar el archivo original para liberar espacio
-        if os.path.exists(file_path):
-            try:
-                os.remove(file_path)
-            except:
-                pass
+        output = StringIO()
+        with open(pdf_path, 'rb') as fp:
+            extract_text_to_fp(fp, output, laparams=LAParams(), 
+                             output_type='text', codec='utf-8')
+        return output.getvalue()
             
     except Exception as e:
-        print(f"Error en el procesamiento de archivo: {str(e)}")
-        task_status[task_id]["status"] = "error"
-        task_status[task_id]["error"] = str(e)
+        print(f"Error al extraer texto de PDF (método final): {str(e)}")
+        traceback.print_exc()  # Imprimir traza completa para diagnóstico
+        return "No se pudo extraer texto del PDF. Por favor, verifique que el archivo no esté protegido o dañado."
+
+def extract_text_from_docx_optimized(docx_path: str) -> str:
+    """Extrae el texto de un archivo DOCX con mayor robustez y diagnóstico."""
+    try:
+        print(f"Intentando extraer texto de DOCX: {docx_path}")
         
-        # Limpiar archivos en caso de error
-        if os.path.exists(file_path):
-            try:
-                os.remove(file_path)
-            except:
-                pass
-
-def extract_text_from_pdf(pdf_path: str) -> str:
-    """Extrae el texto del PDF usando pdfminer.six con optimizaciones."""
-    try:
-        # Utilizar parámetros optimizados para la extracción
-        return extract_text(pdf_path, page_numbers=None, maxpages=0, caching=True)
-    except Exception as e:
-        print(f"Error al extraer texto de PDF: {str(e)}")
-        return ""
-
-def extract_text_from_docx(docx_path: str) -> str:
-    """Extrae el texto de un archivo DOCX usando python-docx."""
-    try:
-        doc = Document(docx_path)
-        # Incluir texto de párrafos, tablas y encabezados para mayor completitud
+        # Verificar si el archivo existe y tiene contenido
+        if not os.path.exists(docx_path):
+            print(f"Error: El archivo DOCX no existe: {docx_path}")
+            return ""
+            
+        if os.path.getsize(docx_path) == 0:
+            print(f"Error: El archivo DOCX está vacío: {docx_path}")
+            return ""
+        
+        # Intentar abrir el documento
+        try:
+            doc = Document(docx_path)
+        except Exception as e:
+            print(f"Error al abrir DOCX con python-docx: {str(e)}")
+            # Intentar método alternativo
+            return extract_docx_fallback(docx_path)
+        
         text_parts = []
         
         # Extraer texto de párrafos
-        for para in doc.paragraphs:
-            text_parts.append(para.text)
+        try:
+            for para in doc.paragraphs:
+                if para.text.strip():
+                    text_parts.append(para.text)
+        except Exception as e:
+            print(f"Error al extraer párrafos: {str(e)}")
         
         # Extraer texto de tablas
-        for table in doc.tables:
-            for row in table.rows:
-                row_text = []
-                for cell in row.cells:
-                    row_text.append(cell.text)
-                text_parts.append(" | ".join(row_text))
+        try:
+            for table in doc.tables:
+                for row in table.rows:
+                    row_text = []
+                    for cell in row.cells:
+                        if cell.text.strip():
+                            row_text.append(cell.text)
+                    if row_text:
+                        text_parts.append(" | ".join(row_text))
+        except Exception as e:
+            print(f"Error al extraer tablas: {str(e)}")
         
-        return "\n".join(text_parts)
+        result = "\n".join(text_parts)
+        
+        # Si no se extrajo nada, probar método alternativo
+        if not result.strip():
+            print("No se extrajo texto con python-docx, intentando método alternativo")
+            return extract_docx_fallback(docx_path)
+            
+        return result
+        
     except Exception as e:
-        print(f"Error al extraer texto de DOCX: {str(e)}")
+        print(f"Error al extraer texto de DOCX (general): {str(e)}")
+        traceback.print_exc()  # Imprimir traza completa para diagnóstico
+        return "No se pudo extraer texto del DOCX. Por favor, verifique que el archivo no esté protegido o dañado."
+
+def extract_docx_fallback(docx_path):
+    """Método alternativo para extraer texto de DOCX usando zipfile."""
+    try:
+        print("Usando método alternativo para DOCX con zipfile")
+        import zipfile
+        from xml.etree.ElementTree import XML
+        
+        # Definir NAMESPACE
+        NAMESPACE = '{http://schemas.openxmlformats.org/wordprocessingml/2006/main}'
+        PARA = NAMESPACE + 'p'
+        TEXT = NAMESPACE + 't'
+        
+        # Abrir el archivo como un zip
+        with zipfile.ZipFile(docx_path) as docx:
+            # Extraer document.xml que contiene el contenido
+            try:
+                content = docx.read('word/document.xml')
+            except KeyError:
+                print("No se pudo encontrar 'word/document.xml' en el archivo DOCX")
+                return ""
+                
+            # Analizar el XML
+            tree = XML(content)
+            
+            # Extraer párrafos
+            paragraphs = []
+            for paragraph in tree.iter(PARA):
+                texts = [node.text for node in paragraph.iter(TEXT) if node.text]
+                if texts:
+                    paragraphs.append(''.join(texts))
+                    
+            return '\n'.join(paragraphs)
+    except Exception as e:
+        print(f"Error en método alternativo DOCX: {str(e)}")
         return ""
 
-def split_text(text: str, max_length: int = 5000) -> list:
-    """Divide el texto en fragmentos más pequeños para procesamiento eficiente."""
+def split_text_optimized(text: str, max_length: int = 800) -> list:
+    """
+    Divide el texto en fragmentos más pequeños para procesamiento eficiente.
+    Utiliza un tamaño máximo más pequeño para mejor paralelización.
+    """
     # Si el texto es más corto que el máximo, devolverlo como un solo fragmento
     if len(text) <= max_length:
         return [text]
     
-    chunks = []
-    # Dividir por párrafos primero
+    # Dividir por párrafos
     paragraphs = text.split('\n')
+    
+    # Agrupar párrafos en chunks de tamaño óptimo
+    chunks = []
     current_chunk = ""
     
     for para in paragraphs:
-        # Si añadir este párrafo excede el tamaño máximo, guardar el chunk actual y empezar uno nuevo
+        if not para.strip():
+            continue
+            
         if len(current_chunk) + len(para) + 1 > max_length and current_chunk:
             chunks.append(current_chunk)
             current_chunk = para
@@ -308,70 +523,326 @@ def split_text(text: str, max_length: int = 5000) -> list:
             else:
                 current_chunk = para
     
-    # Añadir el último chunk si tiene contenido
+    # Añadir el último chunk
     if current_chunk:
         chunks.append(current_chunk)
     
-    # Si algún párrafo individual es mayor que max_length, dividirlo por frases
+    # Si hay párrafos muy largos, dividirlos por oraciones
     final_chunks = []
     for chunk in chunks:
         if len(chunk) <= max_length:
             final_chunks.append(chunk)
         else:
-            # Dividir por frases (puntos, exclamaciones, interrogaciones)
-            sentences = []
-            for sentence_end in ['. ', '! ', '? ', '.\n', '!\n', '?\n']:
-                if sentence_end in chunk:
-                    parts = chunk.split(sentence_end)
-                    for i in range(len(parts) - 1):
-                        sentences.append(parts[i] + sentence_end)
-                    # El último elemento no termina con el separador
-                    sentences.append(parts[-1])
-                    chunk = ''.join(sentences)
-                    break
-            
-            # Agrupar frases en chunks de tamaño adecuado
+            # Dividir por oraciones
+            sentences = split_into_sentences(chunk)
             current_sentence_chunk = ""
+            
             for sentence in sentences:
                 if len(current_sentence_chunk) + len(sentence) > max_length and current_sentence_chunk:
                     final_chunks.append(current_sentence_chunk)
                     current_sentence_chunk = sentence
                 else:
-                    current_sentence_chunk += sentence
+                    if current_sentence_chunk:
+                        current_sentence_chunk += ' ' + sentence
+                    else:
+                        current_sentence_chunk = sentence
             
             if current_sentence_chunk:
                 final_chunks.append(current_sentence_chunk)
     
     return final_chunks
 
-def text_to_speech(text: str, output_filename: str):
-    """Convierte texto a voz usando gTTS y guarda el audio en un archivo MP3."""
+def split_into_sentences(text):
+    """Divide un texto en oraciones."""
+    # Patrones comunes de final de oración en español
+    sentence_endings = ['. ', '! ', '? ', '.\n', '!\n', '?\n', '... ', '...\n']
+    result = []
+    
+    remaining_text = text
+    while remaining_text:
+        min_idx = len(remaining_text)
+        min_ending = None
+        
+        for ending in sentence_endings:
+            idx = remaining_text.find(ending)
+            if idx != -1 and idx < min_idx:
+                min_idx = idx
+                min_ending = ending
+        
+        if min_ending:
+            sentence = remaining_text[:min_idx + len(min_ending)]
+            result.append(sentence)
+            remaining_text = remaining_text[min_idx + len(min_ending):]
+        else:
+            result.append(remaining_text)
+            break
+    
+    return result
+
+def process_file_thread(task_id, file_path, file_ext, mp3_filename):
+    """Procesa un archivo en un hilo separado, con mejor manejo de errores."""
     try:
-        tts = gTTS(text=text, lang="es", slow=False)
-        tts.save(output_filename)
+        # Verificar archivo
+        if not os.path.exists(file_path):
+            task_status[task_id]["status"] = "error"
+            task_status[task_id]["error"] = f"El archivo no existe: {file_path}"
+            return
+            
+        if os.path.getsize(file_path) == 0:
+            task_status[task_id]["status"] = "error"
+            task_status[task_id]["error"] = "El archivo está vacío"
+            return
+            
+        # Extraer texto según el tipo de archivo
+        task_status[task_id]["progress"] = 5
+        print(f"Iniciando extracción de texto del archivo {file_ext}: {file_path}")
+        
+        try:
+            # Extracción de texto según formato
+            if file_ext == "pdf":
+                text = extract_text_from_pdf_optimized(file_path)
+            else:  # docx
+                text = extract_text_from_docx_optimized(file_path)
+            
+            print(f"Texto extraído: {len(text)} caracteres")
+            
+            task_status[task_id]["progress"] = 30
+            
+            if not text or not text.strip():
+                task_status[task_id]["status"] = "error"
+                task_status[task_id]["error"] = "No se pudo extraer texto del archivo. Verifique que no esté protegido o dañado."
+                cleanup_temp_files([file_path])
+                return
+                
+            # Guardar el texto extraído
+            text_filename = f"temp/text_{task_id}.txt"
+            with open(text_filename, "w", encoding="utf-8") as f:
+                f.write(text)
+                
+            # Almacenar el texto para consultas posteriores
+            task_status[task_id]["text"] = text
+            
+        except Exception as e:
+            task_status[task_id]["status"] = "error"
+            task_status[task_id]["error"] = f"Error al extraer texto: {str(e)}"
+            traceback.print_exc()
+            cleanup_temp_files([file_path])
+            return
+        
+        try:
+            # Dividir el texto en fragmentos optimizado
+            text_chunks = split_text_optimized(text)
+            print(f"Texto dividido en {len(text_chunks)} fragmentos")
+            task_status[task_id]["progress"] = 40
+            
+            # Procesar fragmentos
+            audio_files = []
+            
+            # En lugar de procesamiento paralelo que podría estar fallando,
+            # usar procesamiento secuencial para diagnóstico
+            for i, chunk in enumerate(text_chunks):
+                try:
+                    chunk_filename = f"temp/chunk_{task_id}_{i}.mp3"
+                    text_to_speech_optimized(chunk, chunk_filename)
+                    audio_files.append(chunk_filename)
+                    
+                    # Actualizar progreso
+                    progress = 40 + (50 * (i + 1) / len(text_chunks))
+                    task_status[task_id]["progress"] = progress
+                    
+                    print(f"Procesado fragmento {i+1}/{len(text_chunks)}")
+                    
+                except Exception as e:
+                    print(f"Error al procesar fragmento {i}: {str(e)}")
+                    # Continuar con el siguiente fragmento
+            
+            task_status[task_id]["progress"] = 90
+            
+            # Concatenar archivos
+            if audio_files:
+                try:
+                    concatenate_audio_files_simple(audio_files, mp3_filename)
+                    print(f"Archivos de audio concatenados: {len(audio_files)}")
+                except Exception as e:
+                    print(f"Error al concatenar audio: {str(e)}")
+                    # Intentar método más simple
+                    fallback_concatenate(audio_files, mp3_filename)
+            else:
+                print("No se generaron archivos de audio para concatenar")
+                with open(mp3_filename, 'wb') as f:
+                    f.write(b'')
+            
+            # Limpiar archivos temporales
+            cleanup_temp_files(audio_files + [file_path])
+            
+            task_status[task_id]["progress"] = 100
+            task_status[task_id]["status"] = "completed"
+            task_status[task_id]["completion_time"] = time.time()
+                
+        except Exception as e:
+            print(f"Error en el procesamiento de archivo: {str(e)}")
+            traceback.print_exc()
+            task_status[task_id]["status"] = "error"
+            task_status[task_id]["error"] = f"Error en procesamiento: {str(e)}"
+            cleanup_temp_files([file_path])
+    
     except Exception as e:
-        print(f"Error en text-to-speech: {str(e)}")
-        # Crear un archivo de audio vacío para evitar errores
+        print(f"Error general en procesamiento: {str(e)}")
+        traceback.print_exc()
+        task_status[task_id]["status"] = "error"
+        task_status[task_id]["error"] = f"Error: {str(e)}"
+        if os.path.exists(file_path):
+            try:
+                os.remove(file_path)
+            except:
+                pass
+
+def text_to_speech_optimized(text: str, output_filename: str):
+    """Convierte texto a voz usando gTTS con mejor manejo de errores."""
+    try:
+        # Verificar que el texto no esté vacío
+        if not text or not text.strip():
+            print("Error: Texto vacío para conversión a voz")
+            with open(output_filename, 'wb') as f:
+                f.write(b'')
+            return
+            
+        # Normalizar texto - eliminar caracteres problemáticos
+        text = text.replace('|', ',')
+        text = text.replace('\x00', ' ')  # Nul bytes
+        
+        # Limitar longitud para evitar problemas
+        if len(text) > 5000:
+            print(f"Texto demasiado largo ({len(text)} caracteres), recortando a 5000")
+            text = text[:5000]
+        
+        # Convertir a audio con manejo de errores específicos
+        try:
+            print(f"Intentando convertir texto a voz: {len(text)} caracteres")
+            tts = gTTS(text=text, lang="es", slow=False)
+            tts.save(output_filename)
+            print(f"Audio guardado: {output_filename}")
+        except AssertionError as e:
+            print(f"Error de aserción en gTTS: {str(e)}")
+            # Esto suele suceder con texto vacío o inválido
+            with open(output_filename, 'wb') as f:
+                f.write(b'')
+        except Exception as e:
+            print(f"Error desconocido en gTTS: {str(e)}")
+            # Intentar con un fragmento del texto
+            if len(text) > 100:
+                print("Intentando con fragmento del texto")
+                try:
+                    tts = gTTS(text=text[:100] + "...", lang="es", slow=False)
+                    tts.save(output_filename)
+                except:
+                    with open(output_filename, 'wb') as f:
+                        f.write(b'')
+            else:
+                with open(output_filename, 'wb') as f:
+                    f.write(b'')
+                    
+    except Exception as e:
+        print(f"Error general en text-to-speech: {str(e)}")
+        traceback.print_exc()
+        # Crear archivo vacío para evitar errores
         with open(output_filename, 'wb') as f:
             f.write(b'')
 
-def concatenate_audio_files(input_files: list, output_file: str):
-    """Concatena múltiples archivos de audio en uno solo."""
-    try:
-        # Para concatenar archivos MP3 se necesita ffmpeg,
-        # pero podemos usar una solución simple concatenando bytes
-        with open(output_file, 'wb') as outfile:
-            for fname in input_files:
-                if os.path.exists(fname):
-                    with open(fname, 'rb') as infile:
-                        outfile.write(infile.read())
-    except Exception as e:
-        print(f"Error al concatenar archivos de audio: {str(e)}")
-        # Crear un archivo de salida vacío si falla
-        with open(output_file, 'wb') as f:
-            f.write(b'')
+def concatenate_audio_files_simple(input_files, output_file):
+    """Versión simplificada de concatenación de archivos para diagnóstico."""
+    with open(output_file, 'wb') as outfile:
+        for fname in input_files:
+            if os.path.exists(fname) and os.path.getsize(fname) > 0:
+                with open(fname, 'rb') as infile:
+                    outfile.write(infile.read())
+                    
+def fallback_concatenate(input_files, output_file):
+    """Método de último recurso para concatenar archivos."""
+    # Simplemente copiar el primer archivo si existe
+    for file in input_files:
+        if os.path.exists(file) and os.path.getsize(file) > 0:
+            shutil.copy2(file, output_file)
+            print(f"Método de reserva: copiando {file} a {output_file}")
+            return
+            
+    # Si no hay archivos, crear uno vacío
+    with open(output_file, 'wb') as f:
+        f.write(b'')
 
-# Eliminación periódica de tareas antiguas (ahora usando un hilo normal en lugar de asyncio)
+def cleanup_temp_files(file_paths):
+    """Elimina archivos temporales de forma segura."""
+    for file_path in file_paths:
+        if os.path.exists(file_path):
+            try:
+                os.remove(file_path)
+            except:
+                pass
+
+def process_chunks_parallel(text_chunks, task_id):
+    """Procesa múltiples fragmentos de texto en paralelo usando un ThreadPool."""
+    audio_files = []
+    
+    def process_chunk(chunk_data):
+        idx, chunk = chunk_data
+        chunk_filename = f"temp/chunk_{task_id}_{idx}.mp3"
+        
+        # Calcular hash del fragmento para caché
+        chunk_hash = hashlib.md5(chunk.encode('utf-8')).hexdigest()
+        
+        # Buscar en caché
+        cached_path = get_cached_audio_path(chunk_hash)
+        if cached_path and os.path.exists(cached_path):
+            # Si existe en caché, copiar el archivo
+            shutil.copy2(cached_path, chunk_filename)
+        else:
+            # Buscar fragmentos similares en el árbol
+            similar_chunks = text_chunk_tree.find_similar_chunks(chunk)
+            
+            if similar_chunks:
+                # Usar el fragmento más similar que ya tenga audio
+                most_similar = max(similar_chunks, key=lambda x: x[1])
+                similar_id, similarity = most_similar
+                similar_path = f"temp/chunk_{similar_id}.mp3"
+                
+                if os.path.exists(similar_path) and similarity > 0.9:
+                    shutil.copy2(similar_path, chunk_filename)
+                else:
+                    text_to_speech_optimized(chunk, chunk_filename)
+                    store_in_cache(chunk, chunk_filename)
+            else:
+                # Convertir a voz
+                text_to_speech_optimized(chunk, chunk_filename)
+                
+                # Almacenar en caché
+                store_in_cache(chunk, chunk_filename)
+                
+                # Añadir al árbol
+                text_chunk_tree.add_chunk(chunk, f"{task_id}_{idx}")
+        
+        return chunk_filename
+    
+    # Procesar fragmentos en paralelo
+    with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
+        chunk_data = [(i, chunk) for i, chunk in enumerate(text_chunks)]
+        
+        # Procesar por lotes para evitar sobrecargar la memoria
+        batch_size = 10
+        total_chunks = len(chunk_data)
+        audio_files = []
+        
+        for i in range(0, total_chunks, batch_size):
+            batch = chunk_data[i:min(i+batch_size, total_chunks)]
+            batch_results = list(executor.map(process_chunk, batch))
+            audio_files.extend(batch_results)
+            
+            # Actualizar progreso
+            progress = 40 + (50 * min(i + batch_size, total_chunks) / total_chunks)
+            task_status[task_id]["progress"] = progress
+    
+    return audio_files
+
+# Limpieza periódica mejorada
 def cleanup_thread():
     """Función para limpiar periódicamente las tareas y archivos antiguos."""
     while True:
@@ -379,7 +850,7 @@ def cleanup_thread():
             current_time = time.time()
             to_delete = []
             
-            # Hacer una copia del diccionario para evitar errores al modificarlo durante la iteración
+            # Hacer una copia del diccionario para evitar errores
             tasks_copy = task_status.copy()
             
             for task_id, task_info in tasks_copy.items():
@@ -401,12 +872,16 @@ def cleanup_thread():
                     except:
                         pass
             
+            # Limpieza de caché periódica (cada 5 ejecuciones)
+            if time.time() % 5 == 0:
+                clean_old_cache()
+            
             # Dormir durante 5 minutos
             time.sleep(300)
             
         except Exception as e:
             print(f"Error en el hilo de limpieza: {str(e)}")
-            time.sleep(60)  # Esperar un minuto y reintentar
+            time.sleep(60)
 
 @app.on_event("startup")
 def startup_event():

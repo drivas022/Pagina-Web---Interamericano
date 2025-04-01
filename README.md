@@ -13,6 +13,31 @@ Una aplicación web que convierte archivos PDF y DOCX a formato de audio MP3, pe
 - Indicador de progreso en tiempo real
 - Estimación de tiempo restante para la conversión
 
+## 🔄 Flujo de trabajo
+
+1. **Carga de archivos**: 
+   - El usuario sube un archivo PDF o DOCX a través de una interfaz con arrastrar y soltar o selección de archivo
+   - El archivo se valida (formato y tamaño máximo de 50MB)
+
+2. **Procesamiento en el servidor**:
+   - El archivo se envía al servidor y se guarda temporalmente con un ID único
+   - El procesamiento ocurre en segundo plano (usando hilos) para no bloquear la interfaz
+   - Fases del procesamiento:
+     - Extracción del texto del PDF (usando pdfminer.six) o DOCX (usando python-docx)
+     - El texto extraído se guarda en un archivo temporal (`temp/text_{task_id}.txt`)
+     - División del texto en fragmentos manejables si es muy extenso
+     - Conversión de cada fragmento a audio mediante gTTS (Google Text-to-Speech) en español
+     - Concatenación de los fragmentos de audio en un solo archivo MP3 final
+     - Almacenamiento del archivo MP3 resultante en la carpeta "audio"
+   - La interfaz de usuario consulta periódicamente al servidor para mostrar el progreso en tiempo real
+
+3. **Resultado**:
+   - Una vez completado el proceso, el usuario puede:
+     - Ver el texto extraído del documento
+     - Reproducir el audio generado directamente en la web
+     - Descargar el archivo MP3 generado
+     - Descargar el texto extraído como archivo TXT
+
 ## 🛠️ Requisitos previos
 
 - Python 3.7 o superior
@@ -52,7 +77,8 @@ mkdir -p templates static audio temp
 ```bash
 uvicorn main:app --reload
 ```
-O tambien se puede utilizar
+
+O también se puede utilizar:
 
 ```bash
 python -m uvicorn main:app --reload
@@ -105,6 +131,13 @@ http://127.0.0.1:8000
 └── README.md        # Documentación del proyecto
 ```
 
+## 🔧 Configuración avanzada
+
+Para optimizar el procesamiento de archivos grandes, puedes ajustar estos parámetros en main.py:
+
+- `max_length` en la función `split_text`: Controla el tamaño de los fragmentos de texto
+- `factors` en la función `estimate_processing_time`: Ajusta los tiempos estimados según el tipo de archivo
+
 ## ⚠️ Solución de problemas comunes
 
 - **Error "cannot schedule new futures after shutdown"**: 
@@ -121,11 +154,9 @@ http://127.0.0.1:8000
   - Comprueba que el archivo no esté dañado o protegido con contraseña
   - El tamaño debe ser menor a 50MB
 
-## 🔧 Configuración avanzada
+- **La conversión se completa pero el audio no se reproduce**:
+  - Verifica que el archivo MP3 se haya generado correctamente en la carpeta "audio"
+  - Comprueba que tu navegador tenga permisos para reproducir audio
+  - Intenta descargar el archivo y reproducirlo en otro reproductor
 
-Para optimizar el procesamiento de archivos grandes, puedes ajustar estos parámetros en main.py:
-
-- `max_length` en la función `split_text`: Controla el tamaño de los fragmentos de texto
-- `factors` en la función `estimate_processing_time`: Ajusta los tiempos estimados según el tipo de archivo
-
-Desarrollado Diego Rivas
+Desarrollado por Diego Rivas
