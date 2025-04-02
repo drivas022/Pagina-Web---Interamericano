@@ -582,6 +582,7 @@ def split_into_sentences(text):
 
 def process_file_thread(task_id, file_path, file_ext, mp3_filename, lang: str = "es"):
     try:
+        # Verificar archivo
         if not os.path.exists(file_path):
             task_status[task_id]["status"] = "error"
             task_status[task_id]["error"] = f"El archivo no existe: {file_path}"
@@ -591,11 +592,13 @@ def process_file_thread(task_id, file_path, file_ext, mp3_filename, lang: str = 
             task_status[task_id]["status"] = "error"
             task_status[task_id]["error"] = "El archivo está vacío"
             return
-            
+        
+        # Extraer texto según el tipo de archivo
         task_status[task_id]["progress"] = 5
         print(f"Iniciando extracción de texto del archivo {file_ext}: {file_path}")
         
         try:
+            # Extracción de texto según formato
             if file_ext == "pdf":
                 text = extract_text_from_pdf_optimized(file_path)
             else:
@@ -610,9 +613,11 @@ def process_file_thread(task_id, file_path, file_ext, mp3_filename, lang: str = 
                 cleanup_temp_files([file_path])
                 return
             
+            # Guardar el texto extraído
             text_filename = f"temp/text_{task_id}.txt"
             with open(text_filename, "w", encoding="utf-8") as f:
                 f.write(text)
+            # Almacenar el texto para consultas posterior
             task_status[task_id]["text"] = text
             
         except Exception as e:
@@ -623,6 +628,7 @@ def process_file_thread(task_id, file_path, file_ext, mp3_filename, lang: str = 
             return
         
         try:
+            # Dividir el texto en fragmentos optimizado
             text_chunks = split_text_optimized(text)
             print(f"Texto dividido en {len(text_chunks)} fragmentos")
             task_status[task_id]["progress"] = 40
@@ -631,7 +637,7 @@ def process_file_thread(task_id, file_path, file_ext, mp3_filename, lang: str = 
             audio_files = process_chunks_parallel(text_chunks, task_id, lang=lang)
             
             task_status[task_id]["progress"] = 90
-            
+            # Concatenar archivos
             if audio_files:
                 try:
                     concatenate_audio_files_simple(audio_files, mp3_filename)
@@ -643,7 +649,7 @@ def process_file_thread(task_id, file_path, file_ext, mp3_filename, lang: str = 
                 print("No se generaron archivos de audio para concatenar")
                 with open(mp3_filename, 'wb') as f:
                     f.write(b'')
-            
+            # Limpiar archivos temporales
             cleanup_temp_files(audio_files + [file_path])
             
             task_status[task_id]["progress"] = 100
@@ -670,14 +676,14 @@ def process_file_thread(task_id, file_path, file_ext, mp3_filename, lang: str = 
 
 
 def text_to_speech_optimized(text: str, output_filename: str, lang: str = "es"):
-    """Convierte texto a voz usando gTTS con manejo de errores y soporte para idioma."""
     try:
+        # Verificar que el texto no esté vacío
         if not text or not text.strip():
             print("Error: Texto vacío para conversión a voz")
             with open(output_filename, 'wb') as f:
                 f.write(b'')
             return
-            
+        # Normalizar texto - eliminar caracteres problemáticos
         text = text.replace('|', ',').replace('\x00', ' ')
         
         if len(text) > 5000:
@@ -685,6 +691,7 @@ def text_to_speech_optimized(text: str, output_filename: str, lang: str = "es"):
             text = text[:5000]
         
         try:
+            # Convertir a audio con manejo de errores específicos
             print(f"Intentando convertir texto a voz ({len(text)} caracteres) en idioma '{lang}'")
             tts = gTTS(text=text, lang=lang, slow=False)
             tts.save(output_filename)
@@ -710,6 +717,7 @@ def text_to_speech_optimized(text: str, output_filename: str, lang: str = "es"):
     except Exception as e:
         print(f"Error general en text-to-speech: {str(e)}")
         traceback.print_exc()
+        # Crear archivo vacío para evitar errores
         with open(output_filename, 'wb') as f:
             f.write(b'')
 
@@ -745,7 +753,6 @@ def cleanup_temp_files(file_paths):
                 pass
 
 def process_chunks_parallel(text_chunks, task_id, lang: str = "es"):
-    """Procesa múltiples fragmentos de texto en paralelo usando un ThreadPool y soporte de idioma."""
     audio_files = []
     
     def process_chunk(chunk_data):
@@ -755,28 +762,37 @@ def process_chunks_parallel(text_chunks, task_id, lang: str = "es"):
         # Calcular hash y buscar en caché (sin cambios)
         chunk_hash = hashlib.md5(chunk.encode('utf-8')).hexdigest()
         cached_path = get_cached_audio_path(chunk_hash)
+        # Buscar en caché
         if cached_path and os.path.exists(cached_path):
+        # Si existe en caché, copiar el archivo
             shutil.copy2(cached_path, chunk_filename)
         else:
+            # Buscar fragmentos similares en el árbol
             similar_chunks = text_chunk_tree.find_similar_chunks(chunk)
             if similar_chunks:
+                # Usar el fragmento más similar que ya tenga audio
                 most_similar = max(similar_chunks, key=lambda x: x[1])
                 similar_id, similarity = most_similar
                 similar_path = f"temp/chunk_{similar_id}.mp3"
                 if os.path.exists(similar_path) and similarity > 0.9:
                     shutil.copy2(similar_path, chunk_filename)
                 else:
+                    # Convertir a voz
+                    # Almacenar en caché
                     text_to_speech_optimized(chunk, chunk_filename, lang=lang)
                     store_in_cache(chunk, chunk_filename)
             else:
                 text_to_speech_optimized(chunk, chunk_filename, lang=lang)
                 store_in_cache(chunk, chunk_filename)
+                # Añadir al árbol
                 text_chunk_tree.add_chunk(chunk, f"{task_id}_{idx}")
         
         return chunk_filename
     
+    # Procesar fragmentos en paralelo
     with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
         chunk_data = [(i, chunk) for i, chunk in enumerate(text_chunks)]
+        # Procesar por lotes para evitar sobrecargar la memoria
         batch_size = 10
         total_chunks = len(chunk_data)
         audio_files = []
@@ -785,7 +801,7 @@ def process_chunks_parallel(text_chunks, task_id, lang: str = "es"):
             batch = chunk_data[i:min(i+batch_size, total_chunks)]
             batch_results = list(executor.map(process_chunk, batch))
             audio_files.extend(batch_results)
-            
+            # Actualizar progreso
             progress = 40 + (50 * min(i + batch_size, total_chunks) / total_chunks)
             task_status[task_id]["progress"] = progress
     
