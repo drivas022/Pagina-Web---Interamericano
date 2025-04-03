@@ -1,10 +1,14 @@
 # Carpetas a ignorar
 __pycache__/
+audio/
+temp/
+cache/
 
 # Archivos de Python compilados
 *.pyc
 *.pyo
 *.pyd
+*.db
 
 # Archivos multimedia pesados
 *.mp3
