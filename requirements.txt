@@ -4,3 +4,4 @@ python-multipart
 gtts
 pdfminer.six
 python-docx
+sqlite3
