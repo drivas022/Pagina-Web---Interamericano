@@ -1,6 +1,4 @@
 # Carpetas a ignorar
-#audio/ #opcional
-#temp/ #opcional
 __pycache__/
 
 # Archivos de Python compilados
@@ -14,9 +12,6 @@ __pycache__/
 # Archivos PDF
 *.pdf
 
-# Archivos de sistema (opcional)
-.DS_Store
-Thumbs.db
 
 # Entornos virtuales (opcional, si usas venv)
 venv/
@@ -37,6 +32,3 @@ venv/
 # Archivos de configuración local (si tienes)
 config.local.json
 
-# Ignorar todos los .txt excepto requirements.txt
-*.txt
-!requirements.txt
